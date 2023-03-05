@@ -4,9 +4,9 @@ use std::{
 };
 
 use crossterm::{
-    event::{self, DisableMouseCapture, Event, KeyCode},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, LeaveAlternateScreen},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use tui::{
     backend::{Backend, CrosstermBackend},
@@ -58,51 +58,24 @@ impl<'a> App<'a> {
     }
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
+fn ui<B: Backend>(f: &mut Frame<B>, _app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        .constraints([Constraint::Percentage(90)].as_ref())
         .split(f.size());
+
     let barchart = BarChart::default()
-        .block(Block::default().title("Data1").borders(Borders::ALL))
-        .data(&app.data)
-        .bar_width(9)
-        .bar_style(Style::default().fg(Color::Yellow))
-        .value_style(Style::default().fg(Color::Black).bg(Color::Yellow));
+        .block(Block::default().title("Q Sort").borders(Borders::ALL))
+        .bar_width(3)
+        .bar_gap(1)
+        .bar_style(Style::default().fg(Color::Yellow).bg(Color::Red))
+        .value_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
+        .label_style(Style::default().fg(Color::White))
+        .data(&[("B0", 0), ("B1", 2), ("B2", 4), ("B3", 3)])
+        .max(4);
+
     f.render_widget(barchart, chunks[0]);
-
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-        .split(chunks[1]);
-
-    let barchart = BarChart::default()
-        .block(Block::default().title("Data2").borders(Borders::ALL))
-        .data(&app.data)
-        .bar_width(5)
-        .bar_gap(3)
-        .bar_style(Style::default().fg(Color::Green))
-        .value_style(
-            Style::default()
-                .bg(Color::Green)
-                .add_modifier(Modifier::BOLD),
-        );
-    f.render_widget(barchart, chunks[0]);
-
-    let barchart = BarChart::default()
-        .block(Block::default().title("Data3").borders(Borders::ALL))
-        .data(&app.data)
-        .bar_style(Style::default().fg(Color::Red))
-        .bar_width(7)
-        .bar_gap(0)
-        .value_style(Style::default().bg(Color::Red))
-        .label_style(
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::ITALIC),
-        );
-    f.render_widget(barchart, chunks[1]);
 }
 
 fn run_app<B: Backend>(
@@ -117,6 +90,7 @@ fn run_app<B: Backend>(
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())
             .unwrap_or_else(|| Duration::from_secs(0));
+
         if event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
                 if let KeyCode::Char('q') = key.code {
@@ -124,6 +98,7 @@ fn run_app<B: Backend>(
                 }
             }
         }
+
         if last_tick.elapsed() >= tick_rate {
             app.on_tick();
             last_tick = Instant::now();
@@ -134,7 +109,8 @@ fn run_app<B: Backend>(
 fn main() -> Result<(), io::Error> {
     // setup terminal
     enable_raw_mode()?;
-    let stdout = io::stdout();
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
