@@ -3,6 +3,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+use rand::{distributions::Uniform, Rng};
+
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -16,64 +18,49 @@ use tui::{
     Frame, Terminal,
 };
 
-struct App<'a> {
-    data: Vec<(&'a str, u64)>,
+struct App {
+    data: Vec<(String, u64)>,
 }
 
-impl<'a> App<'a> {
-    fn new() -> App<'a> {
-        App {
-            data: vec![
-                ("B1", 9),
-                ("B2", 12),
-                ("B3", 5),
-                ("B4", 8),
-                ("B5", 2),
-                ("B6", 4),
-                ("B7", 5),
-                ("B8", 9),
-                ("B9", 14),
-                ("B10", 15),
-                ("B11", 1),
-                ("B12", 0),
-                ("B13", 4),
-                ("B14", 6),
-                ("B15", 4),
-                ("B16", 6),
-                ("B17", 4),
-                ("B18", 7),
-                ("B19", 13),
-                ("B20", 8),
-                ("B21", 11),
-                ("B22", 9),
-                ("B23", 3),
-                ("B24", 5),
-            ],
-        }
+impl App {
+    fn new(size: usize, range: u64) -> App {
+        let mut rng = rand::thread_rng();
+        let data = (0..size)
+            .map(|i| {
+                let s = format!("B{}", i);
+                (s, rng.sample(Uniform::new(0, range)))
+            })
+            .collect();
+        return App { data };
     }
 
     fn on_tick(&mut self) {
-        let value = self.data.pop().unwrap();
-        self.data.insert(0, value);
+        // let value = self.data.pop().unwrap();
+        // self.data.insert(0, value);
+    }
+
+    fn get_data<'a>(&'a self) -> Vec<(&'a str, u64)> {
+        return self.data.iter().map(|i| (i.0.as_str(), i.1)).collect();
     }
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, _app: &App) {
+fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
         .constraints([Constraint::Percentage(90)].as_ref())
         .split(f.size());
 
+    let data = app.get_data();
+
     let barchart = BarChart::default()
         .block(Block::default().title("Q Sort").borders(Borders::ALL))
         .bar_width(3)
         .bar_gap(1)
-        .bar_style(Style::default().fg(Color::Yellow).bg(Color::Red))
+        .bar_style(Style::default().fg(Color::Gray))
         .value_style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
         .label_style(Style::default().fg(Color::White))
-        .data(&[("B0", 0), ("B1", 2), ("B2", 4), ("B3", 3)])
-        .max(4);
+        .data(data.as_slice());
 
     f.render_widget(barchart, chunks[0]);
 }
@@ -115,7 +102,7 @@ fn main() -> Result<(), io::Error> {
     let mut terminal = Terminal::new(backend)?;
 
     let tick_rate = Duration::from_millis(250);
-    let app = App::new();
+    let app = App::new(20, 20);
     let res = run_app(&mut terminal, app, tick_rate);
 
     // restore terminal
