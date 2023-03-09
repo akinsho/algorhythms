@@ -19,10 +19,11 @@ use tui::{
     Frame, Terminal,
 };
 
-struct App {
+struct App<'a> {
     data: Vec<u64>,
-    _available_algorithms: Vec<Algorithm>,
+    keys: Vec<&'a str>,
     current: Algorithm,
+    _available_algorithms: Vec<Algorithm>,
 }
 
 enum Algorithm {
@@ -39,28 +40,28 @@ impl fmt::Display for Algorithm {
     }
 }
 
-fn __merge(left: Vec<u64>, right: Vec<u64>) -> Vec<u64> {
-    let mut result = Vec::new();
-    let mut l = 0;
-    let mut r = 0;
-    while left[l] <= right[r] {
-        if left[l] < right[r] {
-            result.push(left[l]);
-            l += 1;
+fn __merge<T: Copy + PartialOrd>(x1: &[T], x2: &[T], y: &mut [T]) {
+    assert_eq!(x1.len() + x2.len(), y.len());
+    let mut i = 0;
+    let mut j = 0;
+    let mut k = 0;
+    while i < x1.len() && j < x2.len() {
+        if x1[i] < x2[j] {
+            y[k] = x1[i];
+            k += 1;
+            i += 1;
         } else {
-            result.push(right[r]);
-            r += 1;
+            y[k] = x2[j];
+            k += 1;
+            j += 1;
         }
     }
-    while l < left.len() {
-        result.push(left[l]);
-        l += 1;
+    if i < x1.len() {
+        y[k..].copy_from_slice(&x1[i..]);
     }
-    while r < right.len() {
-        result.push(right[r]);
-        r += 1;
+    if j < x2.len() {
+        y[k..].copy_from_slice(&x2[j..]);
     }
-    return result;
 }
 
 /// step 1: start
@@ -77,67 +78,59 @@ fn __merge(left: Vec<u64>, right: Vec<u64>) -> Vec<u64> {
 ///     merge(array, left, mid, right)
 ///```
 /// step 4: Stop
-fn merge_sort(data: Vec<u64>) -> Vec<u64> {
-    let left_index = 0;
-    let right_index = data.len() - 1;
-    if data[left_index] > data[right_index] {
-        return data;
+fn merge_sort<T: Copy + Ord>(data: &mut [T]) {
+    let end = data.len();
+    let middle = end / 2;
+    if end <= 1 {
+        return;
     }
-    let mid = (left_index + right_index) / 2;
-    let left = data[left_index..mid].to_vec();
-    let right = data[mid + 1..right_index].to_vec();
-    let next_left = merge_sort(left);
-    let next_right = merge_sort(right);
-    return __merge(next_left, next_right);
+    merge_sort(&mut data[0..middle]);
+    merge_sort(&mut data[middle..end]);
+    let mut old_data: Vec<T> = data.to_vec();
+    __merge(&data[0..middle], &data[middle..end], &mut old_data[..]);
 }
 
-fn quick_sort(_data: Vec<u64>) -> Vec<u64> {
+fn quick_sort<T: Copy + Ord>(_data: &mut [T]) {
     todo!()
 }
 
-impl App {
-    fn new(size: usize, range: u64) -> App {
-        let mut rng = rand::thread_rng();
-        let data = (0..size)
-            .map(|i| {
-                let s = format!("B{}", i);
-                (s, rng.sample(Uniform::new(0, range)))
-            })
-            .collect();
-        return App {
-            data,
+impl<'a> App<'a> {
+    fn new(size: usize, range: u64) -> App<'a> {
+        let mut app = App {
+            data: vec![],
+            keys: vec![
+                // TODO: This is an almighty workaround the fact that I have no idea how to
+                // generate this list dynamically e.g.
+                // let keys = (0..range).map(|i| format!("B{}",i).as_ref()).collect();
+                "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "B11", "B12", "B13",
+                "B14", "B15", "B16", "B17", "B18", "B19", "B20", "B21", "B22", "B23", "B24", "B25",
+            ],
             current: Algorithm::MergeSort,
             _available_algorithms: vec![Algorithm::MergeSort, Algorithm::QuickSort],
         };
+
+        let mut rng = rand::thread_rng();
+        app.data = (0..size)
+            .map(|_| rng.sample(Uniform::new(0, range)))
+            .collect();
+        return app;
     }
 
     fn _set_algorithm(&mut self, algorithm: Algorithm) {
         self.current = algorithm;
     }
 
-    fn run_algorithm_tick(&mut self) -> Vec<u64> {
-        let data = self.data.clone();
-        return match self.current {
+    fn run_algorithm_tick(&mut self) {
+        let data = self.data.as_mut_slice();
+        match self.current {
             Algorithm::MergeSort => merge_sort(data),
             Algorithm::QuickSort => quick_sort(data),
         };
+        self.data = data.to_vec();
     }
 
     fn on_tick(&mut self) {
-        let next_data = self.run_algorithm_tick();
-        self.data = next_data;
-    }
-
-    fn get_data<'a>(&'a self) -> Vec<(&'a str, &'a u64)> {
-        let d: Vec<_> = self
-            .data
-            .iter()
-            .map(|i| {
-                let str = format!("B{}", i).as_str();
-                (str, i)
-            })
-            .collect();
-        return d;
+        self.run_algorithm_tick();
     }
 }
 
@@ -148,7 +141,11 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
         .constraints([Constraint::Percentage(90)].as_ref())
         .split(f.size());
 
-    let data = app.get_data();
+    let data: Vec<(&str, u64)> = app
+        .data
+        .iter()
+        .map(|&i| (app.keys[i as usize], i))
+        .collect();
 
     let barchart = BarChart::default()
         .block(
