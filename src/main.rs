@@ -86,8 +86,9 @@ fn merge_sort<T: Copy + Ord>(data: &mut [T]) {
     }
     merge_sort(&mut data[0..middle]);
     merge_sort(&mut data[middle..end]);
-    let mut old_data: Vec<T> = data.to_vec();
-    __merge(&data[0..middle], &data[middle..end], &mut old_data[..]);
+    let mut new_data: Vec<T> = data.to_vec();
+    __merge(&data[0..middle], &data[middle..end], &mut new_data[..]);
+    data.copy_from_slice(&new_data);
 }
 
 fn quick_sort<T: Copy + Ord>(_data: &mut [T]) {
