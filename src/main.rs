@@ -1,3 +1,4 @@
+use core::fmt;
 use std::{
     io,
     time::{Duration, Instant},
@@ -19,7 +20,79 @@ use tui::{
 };
 
 struct App {
-    data: Vec<(String, u64)>,
+    data: Vec<u64>,
+    _available_algorithms: Vec<Algorithm>,
+    current: Algorithm,
+}
+
+enum Algorithm {
+    MergeSort,
+    QuickSort,
+}
+
+impl fmt::Display for Algorithm {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Algorithm::MergeSort => write!(f, "Merge Sort"),
+            Algorithm::QuickSort => write!(f, "Quick Sort"),
+        }
+    }
+}
+
+fn __merge(left: Vec<u64>, right: Vec<u64>) -> Vec<u64> {
+    let mut result = Vec::new();
+    let mut l = 0;
+    let mut r = 0;
+    while left[l] <= right[r] {
+        if left[l] < right[r] {
+            result.push(left[l]);
+            l += 1;
+        } else {
+            result.push(right[r]);
+            r += 1;
+        }
+    }
+    while l < left.len() {
+        result.push(left[l]);
+        l += 1;
+    }
+    while r < right.len() {
+        result.push(right[r]);
+        r += 1;
+    }
+    return result;
+}
+
+/// step 1: start
+///
+/// step 2: declare array and left, right, mid variable
+///
+/// step 3: perform merge function.
+/// ```
+///     if left > right
+///         return
+///     mid=(left+right)/2
+///     mergesort(array, left, mid)
+///     mergesort(array, mid+1, right)
+///     merge(array, left, mid, right)
+///```
+/// step 4: Stop
+fn merge_sort(data: Vec<u64>) -> Vec<u64> {
+    let left_index = 0;
+    let right_index = data.len() - 1;
+    if data[left_index] > data[right_index] {
+        return data;
+    }
+    let mid = (left_index + right_index) / 2;
+    let left = data[left_index..mid].to_vec();
+    let right = data[mid + 1..right_index].to_vec();
+    let next_left = merge_sort(left);
+    let next_right = merge_sort(right);
+    return __merge(next_left, next_right);
+}
+
+fn quick_sort(_data: Vec<u64>) -> Vec<u64> {
+    todo!()
 }
 
 impl App {
@@ -31,16 +104,40 @@ impl App {
                 (s, rng.sample(Uniform::new(0, range)))
             })
             .collect();
-        return App { data };
+        return App {
+            data,
+            current: Algorithm::MergeSort,
+            _available_algorithms: vec![Algorithm::MergeSort, Algorithm::QuickSort],
+        };
+    }
+
+    fn _set_algorithm(&mut self, algorithm: Algorithm) {
+        self.current = algorithm;
+    }
+
+    fn run_algorithm_tick(&mut self) -> Vec<u64> {
+        let data = self.data.clone();
+        return match self.current {
+            Algorithm::MergeSort => merge_sort(data),
+            Algorithm::QuickSort => quick_sort(data),
+        };
     }
 
     fn on_tick(&mut self) {
-        // let value = self.data.pop().unwrap();
-        // self.data.insert(0, value);
+        let next_data = self.run_algorithm_tick();
+        self.data = next_data;
     }
 
-    fn get_data<'a>(&'a self) -> Vec<(&'a str, u64)> {
-        return self.data.iter().map(|i| (i.0.as_str(), i.1)).collect();
+    fn get_data<'a>(&'a self) -> Vec<(&'a str, &'a u64)> {
+        let d: Vec<_> = self
+            .data
+            .iter()
+            .map(|i| {
+                let str = format!("B{}", i).as_str();
+                (str, i)
+            })
+            .collect();
+        return d;
     }
 }
 
@@ -54,7 +151,11 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
     let data = app.get_data();
 
     let barchart = BarChart::default()
-        .block(Block::default().title("Q Sort").borders(Borders::ALL))
+        .block(
+            Block::default()
+                .title(app.current.to_string())
+                .borders(Borders::ALL),
+        )
         .bar_width(3)
         .bar_gap(1)
         .bar_style(Style::default().fg(Color::Gray))
