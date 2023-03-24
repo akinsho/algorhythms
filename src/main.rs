@@ -70,10 +70,13 @@ impl<'a> App<'a> {
         self.current = algorithm;
     }
 
+    // Rather than returning the final value each algorithm could return a list of steps
+    // which would be the value at each point before then end.
     fn run_algorithm_tick(&mut self) {
         let data = self.data.as_mut_slice();
+        let mut steps = vec![];
         match self.current {
-            Algorithm::MergeSort => merge_sort(data),
+            Algorithm::MergeSort => merge_sort(data, &mut steps),
             Algorithm::QuickSort => quick_sort(data),
         };
         self.data = data.to_vec();
