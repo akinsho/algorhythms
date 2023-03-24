@@ -1,6 +1,8 @@
 mod algorithms;
 
-use self::algorithms::{merge_sort::merge_sort, quick_sort::quick_sort};
+use self::algorithms::{
+    insertion_sort::insertion_sort, merge_sort::merge_sort, quick_sort::quick_sort,
+};
 
 use core::fmt;
 use std::{
@@ -26,6 +28,7 @@ use tui::{
 struct App<'a> {
     data: Vec<u64>,
     keys: Vec<&'a str>,
+    steps: Vec<Vec<u64>>,
     current: Algorithm,
     _available_algorithms: Vec<Algorithm>,
 }
@@ -33,6 +36,7 @@ struct App<'a> {
 enum Algorithm {
     MergeSort,
     QuickSort,
+    InsertionSort,
 }
 
 impl fmt::Display for Algorithm {
@@ -40,6 +44,7 @@ impl fmt::Display for Algorithm {
         match self {
             Algorithm::MergeSort => write!(f, "Merge Sort"),
             Algorithm::QuickSort => write!(f, "Quick Sort"),
+            Algorithm::InsertionSort => write!(f, "Insertion Sort"),
         }
     }
 }
@@ -48,6 +53,7 @@ impl<'a> App<'a> {
     fn new(size: usize, range: u64) -> App<'a> {
         let mut app = App {
             data: vec![],
+            steps: vec![],
             keys: vec![
                 // TODO: This is an almighty workaround the fact that I have no idea how to
                 // generate this list dynamically e.g.
@@ -56,7 +62,11 @@ impl<'a> App<'a> {
                 "B14", "B15", "B16", "B17", "B18", "B19", "B20", "B21", "B22", "B23", "B24", "B25",
             ],
             current: Algorithm::MergeSort,
-            _available_algorithms: vec![Algorithm::MergeSort, Algorithm::QuickSort],
+            _available_algorithms: vec![
+                Algorithm::MergeSort,
+                Algorithm::QuickSort,
+                Algorithm::InsertionSort,
+            ],
         };
 
         let mut rng = rand::thread_rng();
@@ -66,24 +76,28 @@ impl<'a> App<'a> {
         return app;
     }
 
-    fn _set_algorithm(&mut self, algorithm: Algorithm) {
-        self.current = algorithm;
-    }
-
-    // Rather than returning the final value each algorithm could return a list of steps
-    // which would be the value at each point before then end.
-    fn run_algorithm_tick(&mut self) {
+    fn set_algorithm(&mut self, algorithm: Algorithm) {
         let data = self.data.as_mut_slice();
+        self.current = algorithm;
         let mut steps = vec![];
         match self.current {
             Algorithm::MergeSort => merge_sort(data, &mut steps),
             Algorithm::QuickSort => quick_sort(data),
+            Algorithm::InsertionSort => insertion_sort(data, &mut steps),
         };
-        self.data = data.to_vec();
+        self.steps = steps;
     }
 
-    fn on_tick(&mut self) {
-        self.run_algorithm_tick();
+    fn run_algorithm_tick(&mut self) -> bool {
+        if self.steps.len() == 0 {
+            return true;
+        }
+        self.data = self.steps.remove(0);
+        return false;
+    }
+
+    fn on_tick(&mut self) -> bool {
+        return self.run_algorithm_tick();
     }
 }
 
@@ -138,7 +152,11 @@ fn run_app<B: Backend>(
         }
 
         if last_tick.elapsed() >= tick_rate {
-            app.on_tick();
+            let finished = app.on_tick();
+            // TODO: currently this stops too quickly/aggressively
+            if finished {
+                return Ok(());
+            }
             last_tick = Instant::now();
         }
     }
@@ -153,7 +171,8 @@ fn main() -> Result<(), io::Error> {
     let mut terminal = Terminal::new(backend)?;
 
     let tick_rate = Duration::from_millis(250);
-    let app = App::new(20, 20);
+    let mut app = App::new(20, 20);
+    app.set_algorithm(Algorithm::InsertionSort);
     let res = run_app(&mut terminal, app, tick_rate);
 
     // restore terminal
